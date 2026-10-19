@@ -1,0 +1,55 @@
+```kotlin
+import android.content.Context
+import android.content.SharedPreferences
+import java.util.Base64
+
+object NoTrackSDK {
+    private const val PREFS_NAME = "NoTrackPrefs"
+    private const val KEY_KEY = "apiKey"
+    private const val SECRET = "NoTrackPremiumAI2024"
+
+    fun saveKey(context: Context, generatedKey: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_KEY, generatedKey)
+            .apply()
+    }
+
+    fun loadAndValidate(context: Context): Boolean {
+        val preferences: SharedPreferences =
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val encodedKey = preferences.getString(KEY_KEY, null) ?: return false
+
+        return try {
+            // Convert from Base64
+            val keyText = Base64.getDecoder().decode(encodedKey).decodeToString()
+
+            // Separate the components
+            val components = keyText.split("|")
+            if (components.size != 5) return false // Expected: deviceId|timestamp|random|sig
+
+            val deviceId = components[0]
+            val timestamp = components[1]
+            val randomValue = components[2]
+            val suppliedSignature = components[3]
+
+            // Generate the signature again
+            val input = "$deviceId|$timestamp|$randomValue"
+            val hmac = javax.crypto.Mac.getInstance("HmacSHA256")
+            hmac.init(
+                javax.crypto.spec.SecretKeySpec(
+                    SECRET.toByteArray(),
+                    "HmacSHA256"
+                )
+            )
+            val signatureBytes = hmac.doFinal(input.toByteArray())
+            val expectedSignature =
+                signatureBytes.joinToString("") { "%02x".format(it) }.lowercase()
+
+            expectedSignature == suppliedSignature.lowercase()
+        } catch (e: Exception) {
+            false
+        }
+    }
+}
+```
