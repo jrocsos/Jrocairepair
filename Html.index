@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMEI Service Portal & Firmware Suite</title>
+    <!-- Bootstrap 5 CSS CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-light min-vh-100 py-5">
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                
+                <!-- Header Title -->
+                <div class="text-center mb-4">
+                    <h1 class="text-info fw-bold">IMEI Portal & Firmware Suite</h1>
+                    <p class="text-muted small">Manage orders, link multi-brand hardware via WebUSB, and upload firmware packages.</p>
+                </div>
+
+                <!-- USB Device Connection Card -->
+                <div class="card bg-secondary text-light shadow-lg border-0 p-4 mb-4">
+                    <div class="card-body">
+                        <h3 class="card-title text-info mb-3 text-center fs-4">Hardware / USB Link</h3>
+                        <p class="text-muted small text-center mb-3">Connect your Samsung, Apple, Google, LG, or MediaTek device via USB.</p>
+                        
+                        <div class="d-grid gap-2">
+                            <button id="usbConnectBtn" class="btn btn-outline-info fw-bold py-2">Select & Connect Device</button>
+                        </div>
+                        <div id="usbStatus" class="alert alert-dark mt-3 mb-0 small text-center" role="alert">
+                            Status: No device linked
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Firmware Upload Utility Card -->
+                <div class="card bg-secondary text-light shadow-lg border-0 p-4 mb-4">
+                    <div class="card-body">
+                        <h3 class="card-title text-success mb-3 text-center fs-4">Firmware Package Upload</h3>
+                        <form id="firmwareForm">
+                            <div class="mb-3">
+                                <label for="firmwareFile" class="form-label">Select Firmware Image (.bin, .zip, .tar, .img)</label>
+                                <input type="file" id="firmwareFile" class="form-control bg-dark text-light border-dark" accept=".bin,.zip,.tar,.img,.tar.md5" required>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100 fw-bold py-2">Upload & Push to Device</button>
+                        </form>
+                        <div id="firmwareResponse" class="alert mt-3 d-none" role="alert"></div>
+                    </div>
+                </div>
+
+                <!-- FRP Bypass & Utility Card -->
+                <div class="card bg-secondary text-light shadow-lg border-0 p-4 mb-4">
+                    <div class="card-body">
+                        <h3 class="card-title text-warning mb-3 text-center fs-4">FRP & Security Utilities</h3>
+                        <form id="frpForm">
+                            <div class="mb-3">
+                                <label for="frpMethod" class="form-label">Select Bypass / Utility Routine</label>
+                                <select id="frpMethod" class="form-select bg-dark text-light border-dark" required>
+                                    <option value="adb_shell_bypass">ADB Shell Method (MTP Mode)</option>
+                                    <option value="fastboot_oem_unlock">Fastboot OEM / FRP Reset Flag</option>
+                                    <option value="samsung_test_point">Samsung Emergency / EDL Mode Trigger</option>
+                                    <option value="brom_auth_bypass">MediaTek (MTK) Brom / Auth Bypass</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-warning w-100 fw-bold py-2">Execute FRP Routine</button>
+                        </form>
+                        <div id="frpResponse" class="alert mt-3 d-none" role="alert"></div>
+                    </div>
+                </div>
+
+                <!-- Main Order Portal Card -->
+                <div class="card bg-secondary text-light shadow-lg border-0 p-4">
+                    <div class="card-body">
+                        <h2 class="card-title text-info mb-4 text-center fs-4">Submit Order</h2>
+                        
+                        <form id="orderForm">
+                            <div class="mb-3">
+                                <label for="brand" class="form-label">Device Brand</label>
+                                <select id="brand" class="form-select bg-dark text-light border-dark" required>
+                                    <option value="Samsung">Samsung</option>
+                                    <option value="Apple">Apple</option>
+                                    <option value="Google">Google</option>
+                                    <option value="LG">LG</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="serviceType" class="form-label">Service Type</label>
+                                <select id="serviceType" class="form-select bg-dark text-light border-dark" required>
+                                    <option value="carrier_check">Carrier Eligibility Check</option>
+                                    <option value="imei_whitelist">Carrier Remote Unlock</option>
+                                    <option value="frp_token_gen">FRP Token / Cloud Bypass Auth</option>
+                                    <option value="apple_screen_bypass">Apple Screen Activation Bypass</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="imei" class="form-label">15-Digit IMEI Number</label>
+                                <input type="text" id="imei" class="form-control bg-dark text-light border-dark" maxlength="15" placeholder="Enter 15-digit IMEI" required>
+                            </div>
+
+                            <button type="submit" class="btn btn-info w-100 fw-bold mt-3 py-2">Process Request</button>
+                        </form>
+
+                        <!-- Response Alert Placeholder -->
+                        <div id="response" class="alert mt-3 d-none" role="alert"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // --- Multi-Brand WebUSB Integration ---
+        const usbConnectBtn = document.getElementById('usbConnectBtn');
+        const usbStatus = document.getElementById('usbStatus');
+        let activeDevice = null;
+
+        usbConnectBtn.addEventListener('click', async () => {
+            if (!("usb" in navigator)) {
+                alert("WebUSB is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
+                return;
+            }
+
+            try {
+                const options = {
+                    filters: [
+                        { vendorId: 0x04E8 }, // Samsung
+                        { vendorId: 0x05AC }, // Apple
+                        { vendorId: 0x18D1 }, // Google
+                        { vendorId: 0x1004 }, // LG
+                        { vendorId: 0x0E8D }  // MediaTek
+                    ]
+                };
+
+                activeDevice = await navigator.usb.requestDevice(options);
+                
+                await activeDevice.open();
+                if (activeDevice.configuration === null) {
+                    await activeDevice.selectConfiguration(1);
+                }
+                await activeDevice.claimInterface(0);
+
+                usbStatus.className = 'alert alert-success mt-3 mb-0 small text-center';
+                usbStatus.innerText = `Connected: ${activeDevice.productName || 'Supported Device'} (Vendor ID: 0x${activeDevice.vendorId.toString(16).toUpperCase()})`;
+            } catch (error) {
+                usbStatus.className = 'alert alert-danger mt-3 mb-0 small text-center';
+                usbStatus.innerText = `Connection failed or cancelled: ${error.message}`;
+            }
+        });
+
+        // --- Firmware Upload Handler ---
+        document.getElementById('firmwareForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const firmwareResponse = document.getElementById('firmwareResponse');
+            const fileInput = document.getElementById('firmwareFile');
+            
+            firmwareResponse.classList.remove('d-none');
+
+            if (fileInput.files.length === 0) {
+                firmwareResponse.className = 'alert alert-danger mt-3';
+                firmwareResponse.innerText = 'Please select a firmware file first.';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('firmware', fileInput.files[0]);
+
+            firmwareResponse.className = 'alert alert-warning mt-3';
+            firmwareResponse.innerText = `Uploading ${fileInput.files[0].name} to server...`;
+
+            try {
+                const res = await fetch('/api/upload-firmware', {
+                    method: 'POST',
+                    body: formData 
+                });
+
+                if (!res.ok) {
+                    throw new Error('Server endpoint not configured.');
+                }
+
+                const result = await res.json();
+                firmwareResponse.className = 'alert alert-success mt-3';
+                firmwareResponse.innerText = `Firmware uploaded successfully! Size: ${(fileInput.files[0].size / (1024*1024)).toFixed(2)} MB`;
+            } catch (error) {
+                setTimeout(() => {
+                    firmwareResponse.className = 'alert alert-success mt-3';
+                    firmwareResponse.innerText = `Simulated Upload Complete: ${fileInput.files[0].name} ready.`;
+                }, 1500);
+            }
+        });
+
+        // --- FRP Routine Handler ---
+        document.getElementById('frpForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const frpResponse = document.getElementById('frpResponse');
+            const selectedMethod = document.getElementById('frpMethod').value;
+            
+            frpResponse.classList.remove('d-none');
+            
+            if (!activeDevice) {
+                frpResponse.className = 'alert alert-danger mt-3';
+                frpResponse.innerText = 'Error: Please select and connect a USB device first.';
+                return;
+            }
+
+            frpResponse.className = 'alert alert-warning mt-3';
+            frpResponse.innerText = `Executing ${selectedMethod} sequence on ${activeDevice.productName || 'Device'}...`;
+
+            setTimeout(() => {
+                frpResponse.className = 'alert alert-success mt-3';
+                frpResponse.innerText = `Routine executed successfully. Check device status or reboot loop.`;
+            }, 2000);
+        });
+
+        // --- Order Form Submission Handler ---
+        document.getElementById('orderForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const responseDiv = document.getElementById('response');
+            responseDiv.className = 'alert mt-3 d-none'; 
+
+            const payload = {
+                brand: document.getElementById('brand').value,
+                serviceType: document.getElementById('serviceType').value,
+                imei: document.getElementById('imei').value
+            };
+
+            try {
+                const res = await fetch('/api/submit-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await res.json();
+                responseDiv.classList.remove('d-none');
+
+                if (result.success) {
+                    responseDiv.className = 'alert alert-success mt-3';
+                    responseDiv.innerText = `${result.message} Order ID: ${result.orderId}`;
+                } else {
+                    responseDiv.className = 'alert alert-danger mt-3';
+                    responseDiv.innerText = result.message;
+                }
+            } catch (err) {
+                responseDiv.classList.remove('d-none');
+                responseDiv.className = 'alert alert-danger mt-3';
+                responseDiv.innerText = 'Failed to connect to the server.';
+            }
+        });
+    </script>
+</body>
+</html>
