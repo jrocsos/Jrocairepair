@@ -1,0 +1,28 @@
+{
+  "name": "jroc-universal-phone-repair-suite",
+  "version": "20.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:web": "vite build",
+    "build:windows": "npm run build:web && electron-builder --win nsis --x64",
+    "dist": "npm run build:windows"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "typescript": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "lucide-react": "latest"
+  },
+  "devDependencies": {
+    "electron": "^38.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "description": "J-ROC Universal Repair Suite PRO - Windows desktop edition",
+  "main": "electron-main.cjs"
+}
